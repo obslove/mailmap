@@ -1,5 +1,9 @@
 # mailmap
 
+[![Python](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Tests](https://img.shields.io/badge/tests-24%20passed-2ea44f)](#verificacao-local)
+[![License](https://img.shields.io/badge/license-MIT-blue)](./pyproject.toml)
+
 Inventário de serviços vinculados a um e-mail via análise de caixa postal por IMAP.
 
 O projeto escaneia a mailbox inteira, reaproveita cache local em SQLite, cruza headers, remetentes, links, HTML, texto e recorrência, e produz um inventário conservador de serviços provavelmente ligados ao endereço analisado.
