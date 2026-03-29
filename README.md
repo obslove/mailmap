@@ -1,200 +1,395 @@
 # mailmap
 
-`mailmap` is a mailbox intelligence CLI that scans your email account over IMAP and produces a conservative inventory of services likely linked to that address.
+Inventário de serviços vinculados a um e-mail via análise de caixa postal por IMAP.
 
-Provider support is not equally simple:
+O projeto escaneia a mailbox inteira, reaproveita cache local em SQLite, cruza headers, remetentes, links, HTML, texto e recorrência, e produz um inventário conservador de serviços provavelmente ligados ao endereço analisado.
 
-- Gmail, Fastmail, Proton Bridge, and many classic IMAP providers are the easiest path.
-- Outlook and Hotmail are experimental because Microsoft often blocks classic IMAP login and may require your own Azure or Entra app registration for OAuth.
+Além do inventário, o `mailmap` também pode:
 
-The normal flow is intentionally simple:
+- gerar um plano de higiene da inbox;
+- montar ações de unsubscribe quando existirem mecanismos padrão;
+- arquivar tráfego de baixa prioridade por serviço.
 
-1. Copy `.env.example` to `.env`
-2. Fill in your IMAP host, email, and password
-3. Run `mailmap`
+> [!IMPORTANT]
+> O fluxo principal continua sendo simples: copiar `.env.example`, preencher as credenciais e rodar `mailmap`.
 
-The default run performs a resumable full scan, reuses cached messages from SQLite, scores services with explainable evidence, and writes:
+> [!NOTE]
+> O projeto prioriza precisão e explicabilidade. Quando a evidência não sustenta certeza, o `mailmap` rebaixa o resultado para `likely-account`, `weak-signal`, `newsletter-only` ou `ambiguous`.
 
-- `services.json`
-- `services.csv`
-- `report.md`
-- optional action plans when requested:
-  - `hygiene.json` / `hygiene.md`
-  - `unsubscribe_actions.json` / `unsubscribe_actions.md`
-  - `clean_results.json` / `clean_results.csv`
+## Instalação rápida
 
-## Install
+Entre no diretório do projeto, crie a venv e instale:
 
 ```bash
 cd /home/ven/Projects/mailmap
-python3.12 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
 
-For development and tests:
+Para desenvolvimento e testes:
 
 ```bash
 pip install -e .[dev]
 ```
 
-## Configure
+No `fish`:
+
+```fish
+source .venv/bin/activate.fish
+```
+
+## Fluxo normal
+
+Uso esperado:
+
+1. copiar `.env.example` para `.env`;
+2. preencher host IMAP, e-mail e senha;
+3. rodar `mailmap`.
+
+Fluxo mínimo:
+
+```bash
+cp .env.example .env
+mailmap
+```
+
+O comando padrão faz:
+
+1. leitura de `.env` e variáveis de ambiente;
+2. conexão segura por IMAP SSL;
+3. descoberta de pastas úteis;
+4. scan completo com UIDs em lotes;
+5. reaproveitamento incremental do cache SQLite;
+6. atribuição de serviços com score explicável;
+7. geração automática de relatórios.
+
+Arquivos gerados no fluxo normal:
+
+- `services.json`
+- `services.csv`
+- `report.md`
+- `mailmap_cache.sqlite3`
+
+Arquivos gerados quando ações extras são pedidas:
+
+- `hygiene.json`
+- `hygiene.md`
+- `unsubscribe_actions.json`
+- `unsubscribe_actions.md`
+- `clean_results.json`
+- `clean_results.csv`
+
+## O que o projeto faz
+
+Durante uma execução normal, o `mailmap`:
+
+1. carrega configuração de CLI, ambiente e `.env`;
+2. valida a configuração e avisa cedo quando o provedor for problemático;
+3. abre a sessão IMAP em modo seguro;
+4. escolhe automaticamente pastas úteis como `INBOX`, `All Mail`, `Archive` e `Sent`;
+5. ignora pastas claramente inúteis, como spam e lixeira, por padrão;
+6. busca mensagens por UID em lotes e salva payload parseado em SQLite;
+7. extrai sinais de headers, assunto, corpo texto, HTML e links;
+8. normaliza domínios, reduz ruído de infraestrutura e rastreamento;
+9. consolida evidência por serviço com score conservador;
+10. exporta resultados legíveis para uso manual e pós-processamento.
+
+Quando flags de ação são usadas, o projeto também pode:
+
+11. gerar recomendações de higiene por serviço;
+12. montar ou executar unsubscribe via `List-Unsubscribe`;
+13. arquivar tráfego de baixa prioridade via IMAP.
+
+## Alvo do projeto
+
+O projeto foi desenhado para o seguinte cenário:
+
+- análise de caixa postal pessoal;
+- provedores IMAP tradicionais;
+- reruns incrementais com cache local;
+- uso local em Linux com Python 3.12+.
+
+Provedores mais simples:
+
+- Gmail
+- Fastmail
+- Proton Bridge
+- outros provedores IMAP tradicionais com senha de app ou IMAP clássico
+
+Provedores problemáticos:
+
+- Outlook / Hotmail
+
+> [!WARNING]
+> Contas Microsoft pessoais são suporte experimental. Muitas bloqueiam IMAP clássico e podem exigir app registration próprio em Azure ou Microsoft Entra para OAuth.
+
+> [!NOTE]
+> O projeto não promete “plug-and-play” universal para todos os provedores. A prioridade é ter um fluxo confiável onde IMAP realmente é viável.
+
+## Configuração
+
+Crie o arquivo local:
 
 ```bash
 cp .env.example .env
 ```
 
-Required variables:
+Variáveis principais:
 
 - `MAILMAP_IMAP_HOST`
+- `MAILMAP_IMAP_PORT`
 - `MAILMAP_EMAIL`
-- `MAILMAP_PASSWORD` for normal IMAP login
+- `MAILMAP_PASSWORD`
+- `MAILMAP_OUTPUT_DIR`
 
-Optional variables:
+Variáveis opcionais:
 
-- `MAILMAP_IMAP_PORT` default `993`
-- `MAILMAP_AUTH_MODE` one of `auto`, `basic`, `microsoft-oauth`
-- `MAILMAP_MICROSOFT_CLIENT_ID` required for Microsoft OAuth
-- `MAILMAP_MICROSOFT_TENANT` default `consumers`
-- `MAILMAP_SMTP_HOST` optional, used for `mailto:` unsubscribe execution
-- `MAILMAP_SMTP_PORT` optional, used for `mailto:` unsubscribe execution
-- `MAILMAP_DEFAULT_FOLDERS` comma-separated override for folder autodiscovery
-- `MAILMAP_OUTPUT_DIR` default `results`
+- `MAILMAP_DEFAULT_FOLDERS`
+- `MAILMAP_AUTH_MODE`
+- `MAILMAP_MICROSOFT_CLIENT_ID`
+- `MAILMAP_MICROSOFT_TENANT`
+- `MAILMAP_SMTP_HOST`
+- `MAILMAP_SMTP_PORT`
 
-App passwords work well for providers that block normal mailbox passwords over IMAP.
+Exemplo simples para Gmail:
 
-### Outlook and Hotmail
+```env
+MAILMAP_IMAP_HOST=imap.gmail.com
+MAILMAP_IMAP_PORT=993
+MAILMAP_EMAIL=voce@gmail.com
+MAILMAP_PASSWORD=sua_senha_de_app
+MAILMAP_AUTH_MODE=basic
+MAILMAP_OUTPUT_DIR=results
+```
 
-Some Microsoft accounts reject classic IMAP username/password login with `BasicAuthBlocked`.
-
-This is not a dead-simple provider in practice. For many personal Microsoft accounts, working OAuth requires creating your own app registration in Azure or Microsoft Entra first.
-
-`mailmap` supports Microsoft OAuth device-code login for those accounts. Set:
+Exemplo para Outlook/Hotmail com OAuth:
 
 ```env
 MAILMAP_IMAP_HOST=imap-mail.outlook.com
 MAILMAP_IMAP_PORT=993
-MAILMAP_EMAIL=you@hotmail.com
+MAILMAP_EMAIL=voce@hotmail.com
 MAILMAP_AUTH_MODE=microsoft-oauth
-MAILMAP_MICROSOFT_CLIENT_ID=your-azure-app-client-id
+MAILMAP_MICROSOFT_CLIENT_ID=seu-client-id-real
 MAILMAP_MICROSOFT_TENANT=consumers
 MAILMAP_OUTPUT_DIR=results
 ```
 
-Then run `mailmap`. On the first run, it will show a verification URL and code. After sign-in, the token is cached locally in the output directory and reused on later runs.
+> [!TIP]
+> Para Gmail, o caminho normal é usar senha de app, não a senha principal da conta.
 
-If you do not already have an Azure or Entra app registration, Outlook and Hotmail will usually not be plug-and-play with `mailmap`.
+## Interação esperada
 
-## Usage
+Na maior parte do tempo, o projeto roda sem prompts extras.
 
-Full default scan:
+Ainda assim, algumas situações podem exigir interação:
+
+- autenticação inicial OAuth da Microsoft;
+- login por browser em device-code flow;
+- unsubscribe manual via link HTTP quando não houver `mailto:`;
+- revisão humana antes de usar `-c` em serviços específicos.
+
+> [!IMPORTANT]
+> `-y` não altera a caixa postal. Ele apenas gera um plano de ação.
+
+> [!WARNING]
+> `-c` modifica a mailbox. Ele move mensagens para a pasta de arquivo quando encontra um destino apropriado.
+
+## Opções disponíveis
+
+Comando base:
 
 ```bash
 mailmap
 ```
 
-Scan recent history only:
+Flags:
+
+- `--since YYYY-MM-DD`
+  Escaneia apenas mensagens a partir da data informada.
+- `--quick`
+  Usa uma análise mais leve e rápida, útil para primeira validação do pipeline.
+- `--output DIR`
+  Grava os artefatos em outro diretório.
+- `-c`, `--clean`
+  Arquiva tráfego de baixa prioridade por serviço.
+- `-u`, `--unsub`
+  Gera ações de unsubscribe e, quando possível, executa unsubscribe por `mailto:`.
+- `-y`, `--hygiene`
+  Gera um plano de higiene da inbox.
+- `-s`, `--services "A,B,C"`
+  Restringe `clean` e `unsub` aos serviços informados.
+- `-h`, `--help`
+  Mostra a ajuda.
+
+Exemplos:
 
 ```bash
+mailmap
 mailmap --since 2024-01-01
-```
-
-Run a shallower scan:
-
-```bash
 mailmap --quick
-```
-
-Write results somewhere else:
-
-```bash
 mailmap --output results/
-```
-
-Generate inbox hygiene recommendations:
-
-```bash
 mailmap -y
-```
-
-Generate unsubscribe actions for low-priority services:
-
-```bash
 mailmap -u
-```
-
-Archive low-priority traffic:
-
-```bash
 mailmap -c
-```
-
-Target specific services for cleanup or unsubscribe:
-
-```bash
 mailmap -c -u -s "Pinterest,Spotify,Twitch"
 ```
 
-## What It Does
+## O que `-y`, `-u` e `-c` fazem
 
-- loads configuration from CLI flags, environment variables, and `.env`
-- connects over IMAP SSL
-- auto-selects useful folders like Inbox, All Mail, Archive, and Sent
-- skips obvious junk folders by default
-- uses UID-based batched fetching
-- caches parsed messages in SQLite for resume and incremental reruns
-- extracts evidence from headers, text, HTML, URLs, and linked domains
-- suppresses infrastructure and tracking domains where possible
-- canonicalizes services conservatively
-- scores findings into `account-confirmed`, `likely-account`, `weak-signal`, `newsletter-only`, or `ambiguous`
-- can generate inbox hygiene plans, unsubscribe actions, and archive cleanups by service
+### `-y`, `--hygiene`
 
-## Outputs
+Não altera nada na inbox.
 
-`services.json`
-- full machine-readable records
+Ele só gera recomendações por serviço, por exemplo:
 
-`services.csv`
-- flat export for spreadsheets
+- `keep`
+- `keep-but-mute`
+- `unsubscribe-and-archive`
+- `archive-or-delete`
 
-`report.md`
-- readable report for a human review
+Arquivos:
 
-`mailmap_cache.sqlite3`
-- local cache and run history
+- `hygiene.json`
+- `hygiene.md`
 
-## Project Layout
+### `-u`, `--unsub`
+
+Tenta encontrar mecanismos de unsubscribe em `List-Unsubscribe`.
+
+Comportamento:
+
+- se houver `mailto:`, pode enviar unsubscribe por SMTP quando configurado;
+- se houver link HTTP, gera o plano para ação manual;
+- evita prometer unsubscribe universal para qualquer serviço.
+
+Arquivos:
+
+- `unsubscribe_actions.json`
+- `unsubscribe_actions.md`
+
+### `-c`, `--clean`
+
+Modifica a mailbox.
+
+Comportamento:
+
+1. escolhe os serviços-alvo;
+2. localiza mensagens mapeadas para esses serviços;
+3. procura uma pasta de arquivo (`All Mail` ou `Archive`);
+4. copia para o destino;
+5. remove da pasta de origem.
+
+Arquivos:
+
+- `clean_results.json`
+- `clean_results.csv`
+
+> [!TIP]
+> Sem `-s`, `clean` e `unsub` atuam primeiro em serviços `newsletter-only` e `weak-signal`.
+
+## Saídas principais
+
+### `services.json`
+
+Inventário completo em formato estruturado, com:
+
+- nome canônico;
+- domínios associados;
+- confiança;
+- status;
+- categorias;
+- contagem de emails;
+- datas;
+- resumo de evidência;
+- remetentes representativos;
+- assuntos representativos;
+- ação recomendada.
+
+### `services.csv`
+
+Exportação plana para planilha.
+
+### `report.md`
+
+Relatório humano legível com:
+
+- serviço;
+- score;
+- status;
+- categorias;
+- datas;
+- resumo;
+- razões do score;
+- ação recomendada.
+
+### `mailmap_cache.sqlite3`
+
+Cache local e checkpoint incremental.
+
+## Estrutura do projeto
 
 ```text
 src/mailmap/
-  cli.py
+  actions.py
+  aggregation.py
   app.py
+  cli.py
   config.py
-  imap_client.py
-  message_parser.py
   content.py
+  database.py
   domains.py
   evidence.py
-  scoring.py
-  aggregation.py
-  database.py
   exporters.py
+  fingerprints.py
+  imap_client.py
+  message_parser.py
+  models.py
+  oauth.py
+  scoring.py
   ui.py
 tests/
 examples/
 ```
 
-## Reliability Notes
+## Precisão e limites
 
-- malformed messages are skipped instead of crashing the run
-- folder-level failures are counted and the scan continues where possible
-- logs stay compact in normal mode and do not dump message bodies
-- attribution stays conservative and falls back to `ambiguous` when evidence conflicts
+O projeto já faz:
 
-## Example Outputs
+- redução de falsos positivos por domínio;
+- distinção entre infra, tracking e marca real;
+- rebaixamento de streams dominados por newsletter;
+- penalidade por proporção fraca entre evidência forte e volume total;
+- fallback para `ambiguous` quando a atribuição não estiver limpa.
 
-See:
+Limites reais:
 
-- `examples/services.json`
-- `examples/services.csv`
-- `examples/report.md`
+- unsubscribe não é universal;
+- desvinculação de conta não faz parte do fluxo automático;
+- alguns provedores quebram a simplicidade do setup por decisão deles, não do projeto;
+- atribuição perfeita para qualquer inbox do mundo não é uma meta realista.
+
+> [!NOTE]
+> O objetivo do `mailmap` é produzir um inventário defensável e útil, não fingir certeza onde a evidência é incompleta.
+
+## Verificação local
+
+Rodar testes:
+
+```bash
+PYTHONPATH=src .venv/bin/pytest -q
+```
+
+Ver ajuda da CLI:
+
+```bash
+PYTHONPATH=src .venv/bin/mailmap --help
+```
+
+## Arquivos de exemplo
+
+Veja:
+
+- [examples/services.json](examples/services.json)
+- [examples/services.csv](examples/services.csv)
+- [examples/report.md](examples/report.md)
