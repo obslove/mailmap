@@ -1,0 +1,2 @@
+service,confidence,status,categories,total_related_emails,first_seen,last_seen,associated_domains,evidence_summary
+GitHub,92,account-confirmed,developer,14,2023-02-11,2026-03-20,github.com,"6 strong transactional/security signals, 14 related messages"

@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mailmap"
+version = "0.1.0"
+description = "Mailbox intelligence CLI for mapping services linked to an email account."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "ven" }
+]
+dependencies = [
+  "beautifulsoup4>=4.12.3,<5.0.0",
+  "msal>=1.31.0,<2.0.0",
+  "python-dotenv>=1.0.1,<2.0.0",
+  "rich>=13.9.0,<14.0.0",
+  "tldextract>=5.1.2,<6.0.0",
+  "typer>=0.16.0,<1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0,<9.0.0",
+]
+
+[project.scripts]
+mailmap = "mailmap.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "S", "RUF"]
+ignore = ["S324"]

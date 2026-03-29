@@ -1,0 +1,30 @@
+[
+  {
+    "canonical_name": "GitHub",
+    "associated_domains": [
+      "github.com"
+    ],
+    "confidence": 92,
+    "status": "account-confirmed",
+    "categories": [
+      "developer"
+    ],
+    "total_related_emails": 14,
+    "first_seen": "2023-02-11",
+    "last_seen": "2026-03-20",
+    "evidence_summary": "6 strong transactional/security signals, 14 related messages",
+    "representative_senders": [
+      "noreply@github.com"
+    ],
+    "representative_subject_lines": [
+      "Please verify your email address",
+      "New sign-in to GitHub"
+    ],
+    "reasoning": [
+      "Security phrase matched: verify email",
+      "Sender domain observed: github.com",
+      "Recurring presence across at least 3 messages"
+    ],
+    "ambiguity_notes": []
+  }
+]
